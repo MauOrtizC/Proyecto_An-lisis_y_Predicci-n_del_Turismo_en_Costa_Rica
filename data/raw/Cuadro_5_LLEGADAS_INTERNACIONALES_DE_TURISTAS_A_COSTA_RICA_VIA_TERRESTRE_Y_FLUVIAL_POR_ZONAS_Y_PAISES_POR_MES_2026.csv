@@ -1,0 +1,92 @@
+Zona_Pais,Enero,Febrero,Total_Ene_Feb
+TOTAL,26563,21444,48007
+
+AMÉRICA DEL NORTE,5600,4836,10336
+Canadá,2082,2021,4103
+Estados Unidos,2928,2597,5525
+México,310,218,528
+
+AMÉRICA CENTRAL,13329,9938,23265
+Belice,6,38,44
+El Salvador,443,299,742
+Guatemala,275,218,493
+Honduras,2605,3083,5688
+Nicaragua,805,279,1084
+Panamá,3440,2991,6431
+
+AMÉRICA DEL SUR,1214,924,2138
+Argentina,512,382,894
+Bolivia,25,10,35
+Brasil,157,102,259
+Chile,135,18,153
+Colombia,230,216,446
+Ecuador,22,22,44
+Guyana,,1,1
+Guyana Francesa,,,
+Paraguay,7,3,10
+Perú,103,113,216
+Surinam,,,
+Uruguay,52,18,70
+Venezuela,10,6,16
+
+CARIBE,20,22,42
+Bahamas,4,8,12
+Bermuda,,,
+Cuba,8,3,11
+Haití,,,
+Jamaica,3,2,5
+Puerto Rico,,,
+República Dominicana,,,
+Trinidad y Tobago,1,1,2
+Otros Caribe,,5,5
+
+EUROPA,5842,5302,11144
+Alemania,1388,1265,2653
+Austria,128,146,274
+Bélgica,111,103,214
+Dinamarca,93,142,235
+Eslovaquia,25,29,54
+España,335,314,649
+Finlandia,48,22,70
+Francia,598,615,1213
+Hungría,31,28,59
+Irlanda,56,59,115
+Israel,126,186,312
+Italia,187,198,385
+Noruega,67,63,130
+Países Bajos,578,442,1020
+Polonia,235,240,475
+Portugal,32,45,77
+Reino Unido,384,419,803
+República Checa,107,105,212
+Rumanía,47,13,60
+Rusia,10,58,68
+Suecia,151,135,286
+Suiza,327,282,609
+Otros Europa,198,199,397
+
+ASIA Y EL PACÍFICO,699,663,1362
+China,123,97,220
+Filipinas,133,110,243
+India,47,80,127
+Japón,27,52,79
+Rep. de Corea (Sur),29,26,55
+Rep. Dem. Pop. Corea (Norte),,,
+Taiwan,26,15,41
+Australia,142,123,265
+Nueva Zelanda,49,38,87
+Otros Asia y el Pacífico,53,13,66
+
+ÁFRICA,21,15,36
+Marruecos,3,6,9
+Nigeria,,18,18
+Sudáfrica,18,15,33
+Otros África,,,
+
+ORIENTE MEDIO,10,9,19
+Arabia Saudita,,2,2
+Egipto,6,2,8
+Emiratos Árabes Unidos,,2,2
+Jordania,1,1,2
+Líbano,,,
+Otros Oriente Medio,2,4,6
