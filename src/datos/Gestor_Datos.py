@@ -140,13 +140,44 @@ class GestorDatos:
     # ----------------------------------------------------------
     def procesar_archivo_individual(self, nombre_archivo: str, nombre_salida: str = None):
         """
-        Procesa un archivo individual: normaliza encabezados y nombres, reemplaza valores faltantes por 0.
-        Ejemplo: TurismoHistorico.csv.
+        Procesa un archivo individual:
+        - Elimina la columna 'id'.
+        - Mueve la fila 'Total' al final.
+        - Reemplaza valores vacíos o NA por 0.
+        - Limpia nombres de columnas y zonas.
+        - Renombra columnas tipo 'Ano2017' → '2017'.
         """
+
+        # Cargar el archivo
         df = self.cargar_datos(nombre_archivo)
         df = self.limpiar_datos(df)
 
-        # Normalizar nombres de columnas
+        # Eliminar la columna 'id' si existe
+        if "id" in df.columns:
+            df.drop(columns=["id"], inplace=True)
+            print("📤 Columna 'id' eliminada.")
+
+        # Normalizar columna de regiones
+        if "Zona_Pais" in df.columns:
+            df["Zona_Pais"] = df["Zona_Pais"].astype(str).apply(self._normalizar_texto_simple)
+
+        # Reemplazar vacíos por 0 y convertir tipos
+        df.replace(r'^\s*$', pd.NA, regex=True, inplace=True)
+        df.fillna(0, inplace=True)
+        for col in df.columns:
+            try:
+                df[col] = pd.to_numeric(df[col])
+            except (ValueError, TypeError):
+                pass
+
+        # Mover la fila 'Total' al final
+        if "Zona_Pais" in df.columns:
+            mask_total = df["Zona_Pais"].str.contains("TOTAL", case=False, na=False)
+            df_total = df[mask_total]
+            df = pd.concat([df[~mask_total], df_total], axis=0)
+            print("📦 Fila 'Total' movida al final.")
+
+        # Limpiar nombres de columnas y eliminar tildes
         nuevos_nombres = {}
         for col in df.columns:
             base = (
@@ -157,35 +188,37 @@ class GestorDatos:
                 .replace(" ", "_")
                 .replace("-", "_")
             )
+
+            # Nueva regla: si comienza con "Ano" seguido de números → quitar "Ano"
+            if base.lower().startswith("ano") and base[3:].isdigit():
+                base = base[3:]  # quedará solo el año, ej. "2017"
+
             nuevos_nombres[col] = base
+
         df.rename(columns=nuevos_nombres, inplace=True)
 
-        # Convertir texto de zonas o países a formato estandar (mayúsculas sin tildes)
-        if "Zona_Pais" in df.columns:
-            df["Zona_Pais"] = df["Zona_Pais"].astype(str).apply(self._normalizar_texto_simple)
-
-        # Reemplazar vacíos o cadenas vacías por 0 (adicional)
-        df.replace(r'^\s*$', pd.NA, regex=True, inplace=True)
-        df.fillna(0, inplace=True)
-
-        # Convertir columnas numéricas si es posible
-        for col in df.columns:
-            try:
-                df[col] = pd.to_numeric(df[col])
-            except (ValueError, TypeError):
-                # Si no se puede convertir, se deja como está
-                pass
-
-                # Definir nombre de salida
+        # Exportar archivo procesado
         if not nombre_salida:
             nombre_salida = os.path.splitext(nombre_archivo)[0] + "_procesado.csv"
 
-        # Exportar
         self.exportar_datos(df, nombre_salida)
-        print(f"Archivo individual procesado y exportado como: {nombre_salida}")
+
+        print(f"✅ Archivo procesado y exportado como: {nombre_salida}")
+        print(f"Filas: {df.shape[0]}, Columnas: {df.shape[1]}")
+        print(f"Columnas finales: {df.columns.tolist()}")
         return df
 
-    # ----------------------------------------------------------
+        # Exportar archivo procesado
+        if not nombre_salida:
+            nombre_salida = os.path.splitext(nombre_archivo)[0] + "_procesado.csv"
+
+        self.exportar_datos(df, nombre_salida)
+
+        print(f"✅ Archivo procesado y exportado como: {nombre_salida}")
+        print(f"Filas: {df.shape[0]}, Columnas: {df.shape[1]}")
+        return df
+
+        # ----------------------------------------------------------
     def exportar_datos(self, df: pd.DataFrame, nombre_salida: str):
         ruta_salida = os.path.join(self.ruta_processed, nombre_salida)
         df.to_csv(ruta_salida, index=False, encoding="utf-8-sig")
