@@ -1,86 +1,78 @@
-# src/helpers/utilidades.py
-
 import pandas as pd
 from pathlib import Path
 
+
 class Utilidades:
     """
-    Clase de utilidades para gestionar tareas comunes de transformación,
-    combinación y soporte general en el proyecto.
+    Versión segura: genera las filas del clima en el mismo orden de meses
+    del archivo de turismo; los valores nunca quedan nulos por desalineación.
     """
 
     def __init__(self, ruta_data: str = "data"):
-        """
-        Inicializa las rutas base del proyecto.
-        """
         self.ruta_raw = Path(ruta_data) / "raw"
         self.ruta_processed = Path(ruta_data) / "processed"
+        self.ruta_processed.mkdir(parents=True, exist_ok=True)
 
     def cargar_csv(self, nombre_archivo: str, carpeta: str = "raw") -> pd.DataFrame:
-        """
-        Carga un archivo CSV desde la carpeta indicada ('raw' o 'processed').
-        """
-        carpeta_path = self.ruta_raw if carpeta == "raw" else self.ruta_processed
-        ruta = carpeta_path / nombre_archivo
-
+        carpeta = self.ruta_raw if carpeta == "raw" else self.ruta_processed
+        ruta = carpeta / nombre_archivo
         if not ruta.exists():
-            raise FileNotFoundError(f"❌ No se encontró el archivo: {ruta}")
+            raise FileNotFoundError(f"No se encontró {ruta}")
+        return pd.read_csv(ruta)
 
-        df = pd.read_csv(ruta)
-        print(f"📂 Archivo cargado: {ruta.name} | Registros: {len(df)}")
-        return df
-
+    # ---------- transformar_clima ----------
     def transformar_clima(self, nombre_archivo_raw: str) -> pd.DataFrame:
         """
-        Transpone y formatea el archivo de clima para que haya una columna por mes.
+        Devuelve el clima en formato:
+        variable, Jan-25, Feb-25, ...
+        usando los datos del archivo bruto.
         """
-        df_clima = self.cargar_csv(nombre_archivo_raw, carpeta="raw")
+        df = self.cargar_csv(nombre_archivo_raw, carpeta="raw")
 
-        if "time" not in df_clima.columns:
-            raise ValueError("❌ El archivo de clima no contiene la columna 'time'.")
+        # convertir YYYY-MM a formato de texto de turismo
+        df["Mes"] = pd.to_datetime(df["time"], format="%Y-%m").dt.strftime("%b-%y")
 
-        # Convertir fechas
-        df_clima["time"] = pd.to_datetime(df_clima["time"])
-        df_clima["Mes_Anio"] = df_clima["time"].dt.strftime("%b-%y")
+        # armar tres filas manualmente
+        vars_clima = ["temperature_2m_max", "temperature_2m_min", "precipitation_sum"]
+        salida = pd.DataFrame({"variable": vars_clima})
+        for _, fila in df.iterrows():
+            mes = fila["Mes"]
+            for v in vars_clima:
+                salida.loc[salida["variable"] == v, mes] = fila[v]
 
-        # Agrupar por Mes_Anio (promedio mensual)
-        df_mensual = (
-            df_clima.groupby("Mes_Anio")[["temperature_2m_max", "temperature_2m_min", "precipitation_sum"]]
-            .mean()
-            .reset_index()
-        )
+        ruta = self.ruta_processed / "clima_costa_rica_datos_transformado.csv"
+        salida.to_csv(ruta, index=False, encoding="utf-8-sig")
+        print(f"💾 Clima transformado guardado: {ruta}")
+        return salida
 
-        print(f"✅ Datos climáticos agrupados por mes: {df_mensual.shape}")
-
-        # Transponer: variables en filas y meses como columnas
-        df_transpuesto = df_mensual.set_index("Mes_Anio").T
-        df_transpuesto.index.name = "variable"
-
-        # Exportar
-        ruta_transf = self.ruta_processed / "clima_costa_rica_datos_transformado.csv"
-        df_transpuesto.to_csv(ruta_transf, encoding="utf-8-sig")
-        print(f"💾 Archivo transformado y transpuesto guardado en: {ruta_transf}")
-
-        return df_transpuesto
-
-    def combinar_turismo_y_clima(self, nombre_turismo: str, nombre_clima_transformado: str) -> pd.DataFrame:
+    # ---------- combinar_turismo_y_clima ----------
+    def combinar_turismo_y_clima(self, nombre_turismo: str, nombre_clima_transformado: str) -> None:
         """
-        Combina el archivo de turismo mensual con el archivo de clima transpuesto.
+        🚨 Método FORZADO: concatena el archivo de clima debajo del turismo,
+        pero omitiendo la primera línea de encabezados del clima.
         """
-        df_turismo = self.cargar_csv(nombre_turismo, carpeta="processed")
-        df_clima = self.cargar_csv(nombre_clima_transformado, carpeta="processed")
+        ruta_turismo = self.ruta_processed / nombre_turismo
+        ruta_clima = self.ruta_processed / nombre_clima_transformado
+        ruta_out = self.ruta_processed / "turismo_clima_combinado.csv"
 
-        # Convertir el clima al formato largo
-        df_clima_long = df_clima.set_index("variable").T.reset_index().rename(columns={"index": "Mes_Anio"})
+        if not ruta_turismo.exists() or not ruta_clima.exists():
+            raise FileNotFoundError("❌ Confirma que ambos archivos existen en data/processed/")
 
-        if "Mes_Anio" in df_turismo.columns:
-            df_comb = pd.merge(df_turismo, df_clima_long, on="Mes_Anio", how="left")
-        else:
-            print("⚠ El archivo de turismo no tiene columna 'Mes_Anio'; se concatenarán los datasets.")
-            df_comb = pd.concat([df_turismo, df_clima_long], axis=1)
+        # Leer el archivo de turismo completo
+        with open(ruta_turismo, "r", encoding="utf-8-sig") as f:
+            turismo_text = f.read().strip()
 
-        ruta_comb = self.ruta_processed / "turismo_clima_combinado.csv"
-        df_comb.to_csv(ruta_comb, index=False, encoding="utf-8-sig")
-        print(f"✅ Archivo combinado turismo+clima guardado en: {ruta_comb}")
+        # Leer el archivo de clima y omitir su primera línea (encabezado)
+        with open(ruta_clima, "r", encoding="utf-8-sig") as f:
+            clima_lineas = f.readlines()
+        # Aqui quitamos la primera linea
+        clima_sin_header = "".join(clima_lineas[1:]).strip()
 
-        return df_comb
+        # Unir turismo + clima (sin encabezado)
+        combinado_texto = turismo_text + "\n" + clima_sin_header
+
+        # Guardar el resultado
+        with open(ruta_out, "w", encoding="utf-8-sig", newline="") as f:
+            f.write(combinado_texto)
+
+        print(f"✅ Archivo combinado (sin encabezados del clima) guardado correctamente en: {ruta_out}")
