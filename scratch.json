@@ -1,0 +1,194 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# 📊 Modelo de Predicción de Turismo en Costa Rica\n",
+    "### Predictivo supervisado (Regresión): Linear, KNN, Random Forest\n",
+    "Este notebook entrena modelos para predecir la cantidad de turistas mensuales usando clima y país de origen, y genera una proyección para Marzo–Diciembre 2026."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import sys\n",
+    "sys.path.append('../src/')\n",
+    "\n",
+    "from modelos.modelo_ml import ModeloML\n",
+    "import pandas as pd\n",
+    "import numpy as np\n",
+    "import matplotlib.pyplot as plt\n",
+    "import seaborn as sns"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# ### 1️⃣ Carga y transformación de datos\n",
+    "modelo = ModeloML('../data/processed/turismo_clima_combinado_.txt')\n",
+    "df_raw = modelo.cargar_datos()\n",
+    "df_modelo = modelo.transformar_datos()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# ### 2️⃣ Entrenamiento de modelos y resultados\n",
+    "resultados = modelo.entrenar_modelos()\n",
+    "resultados"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# ### 3️⃣ Gráficos comparativos de desempeño\n",
+    "sns.set(style=\"whitegrid\")\n",
+    "\n",
+    "plt.figure(figsize=(7,5))\n",
+    "sns.barplot(x='Modelo', y='R2_Test', data=resultados, palette='viridis')\n",
+    "plt.title('Comparación de desempeño - R²')\n",
+    "plt.show()\n",
+    "\n",
+    "plt.figure(figsize=(7,5))\n",
+    "sns.barplot(x='Modelo', y='RMSE_Test', data=resultados, palette='magma')\n",
+    "plt.title('Comparación de desempeño - RMSE')\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# ### 4️⃣ Importancia de variables (Random Forest)\n",
+    "rf = modelo.modelos['rf']\n",
+    "importances = pd.Series(rf.feature_importances_, index=modelo.df_modelo.drop('Turistas', axis=1).columns).sort_values(ascending=True)\n",
+    "\n",
+    "plt.figure(figsize=(10,6))\n",
+    "importances.plot(kind='barh', color='darkcyan')\n",
+    "plt.title('Importancia de variables (Random Forest)')\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# ### 5️⃣ Simulación de escenarios futuros (Mar–Dic 2026)\n",
+    "# Crear escenario hipotético de clima atípico\n",
+    "zonas_existentes = modelo.df['Zona_Pais'].unique()\n",
+    "zonas_existentes = [z for z in zonas_existentes if not z.startswith('temp')]\n",
+    "clima_promedios = modelo.df_modelo[['temperature_2m_max','temperature_2m_min','precipitation_sum']].mean()\n",
+    "\n",
+    "meses_futuros = [f\"{str(m).zfill(2)}-2026\" for m in range(3, 13)]\n",
+    "df_futuro = []\n",
+    "for zona in zonas_existentes:\n",
+    "    for mes in meses_futuros:\n",
+    "        df_futuro.append({\n",
+    "            'Zona_Pais': zona,\n",
+    "            'Mes': mes,\n",
+    "            'Año': 2026,\n",
+    "            'Mes_Num': int(mes[:2]),\n",
+    "            'temperature_2m_max': clima_promedios['temperature_2m_max'] + np.random.uniform(3,6),\n",
+    "            'temperature_2m_min': clima_promedios['temperature_2m_min'] + np.random.uniform(1,3),\n",
+    "            'precipitation_sum': clima_promedios['precipitation_sum'] * np.random.uniform(1.5,2.5)\n",
+    "        })\n",
+    "\n",
+    "df_futuro = pd.DataFrame(df_futuro)\n",
+    "df_futuro = pd.get_dummies(df_futuro, columns=['Zona_Pais'], drop_first=True)\n",
+    "df_futuro.head()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# ### 6️⃣ Predicción con el modelo Random Forest\n",
+    "cols_entrenadas = modelo.df_modelo.drop('Turistas',axis=1).columns\n",
+    "for col in cols_entrenadas:\n",
+    "    if col not in df_futuro.columns:\n",
+    "        df_futuro[col] = 0\n",
+    "df_futuro = df_futuro[cols_entrenadas]\n",
+    "\n",
+    "prediccion_futura = rf.predict(df_futuro)\n",
+    "\n",
+    "resultados_futuros = df_futuro.copy()\n",
+    "resultados_futuros['Pred_Turistas'] = prediccion_futura\n",
+    "resultados_futuros = resultados_futuros[['Mes_Num','Año','Pred_Turistas']].groupby(['Mes_Num','Año']).sum().reset_index()\n",
+    "resultados_futuros['Mes'] = resultados_futuros['Mes_Num'].apply(lambda x: pd.to_datetime(f\"{x}-2026\", format=\"%m-%Y\"))\n",
+    "resultados_futuros = resultados_futuros.sort_values('Mes')\n",
+    "resultados_futuros"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# ### 7️⃣ Visualización de predicciones (Mar–Dic 2026)\n",
+    "plt.figure(figsize=(10,6))\n",
+    "sns.lineplot(data=resultados_futuros, x='Mes', y='Pred_Turistas', marker='o')\n",
+    "plt.title('Predicción estimada de llegadas de turistas - 2026')\n",
+    "plt.ylabel('Número de turistas (estimado)')\n",
+    "plt.xlabel('Mes')\n",
+    "plt.xticks(rotation=45)\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# ### 8️⃣ Guardar modelo entrenado\n",
+    "modelo.guardar_modelo('modelo_turismo_RF.pkl')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "✅ **Notebook completado**\n",
+    "\n",
+    "- Entrena modelos de regresión supervisada.\n",
+    "- Evalúa desempeño con R² y RMSE.\n",
+    "- Simula escenarios climáticos futuros.\n",
+    "- Genera predicciones mensuales de turistas para marzo–diciembre 2026.\n",
+    "- Guarda modelo Random Forest entrenado en `/models/modelo_turismo_RF.pkl`."
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "name": "python",
+   "version": "3"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
